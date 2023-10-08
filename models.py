@@ -1,18 +1,21 @@
 import atexit
 import os
-from sqlalchemy import create_engine, Column, Integer, String, DateTime, func
-from sqlalchemy.orm import sessionmaker
+
+from dotenv import load_dotenv
+from sqlalchemy import Column, DateTime, Integer, String, create_engine, func
 from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
 
-POSTGRES_DB = os.getenv('POSTGRES_DB', 'my_db')
-POSTGRES_USER = os.getenv('POSTGRES_USER', 'my_user')
-POSTGRES_PASSWORD = os.getenv('POSTGRES_PASSWORD', 'my_password')
-POSTGRES_HOST = os.getenv('POSTGRES_HOST', '127.0.0.1')
-POSTGRES_PORT = os.getenv('POSTGRES_PORT', 5431)
+load_dotenv()
 
-#DSN = f'postgresql://postgres:{pas}@localhost:5432/magazine_of_publisher'
-#engine = sq.create_engine(DSN)
-DSN = f'postgresql://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}'
+POSTGRES_DB = os.getenv("POSTGRES_DB")
+POSTGRES_USER = os.getenv("POSTGRES_USER")
+POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD")
+POSTGRES_HOST = os.getenv("POSTGRES_HOST")
+POSTGRES_PORT = os.getenv("POSTGRES_PORT")
+
+
+DSN = f"postgresql://{POSTGRES_USER}:{POSTGRES_PASSWORD}@{POSTGRES_HOST}:{POSTGRES_PORT}/{POSTGRES_DB}"
 engine = create_engine(DSN)
 atexit.register(engine.dispose)
 
@@ -20,14 +23,14 @@ Session = sessionmaker(bind=engine)
 Base = declarative_base(bind=engine)
 
 
-class User(Base):
-
-    __tablename__ = 'app_users'
+class Advert(Base):
+    __tablename__ = "advertisements"
 
     id = Column(Integer, primary_key=True)
-    name = Column(String, nullable=False, unique=True, index=True)
-    password = Column(String, nullable=False)
+    header = Column(String, nullable=False, unique=True)
+    description = Column(String)
     creation_time = Column(DateTime, server_default=func.now())
+    user = Column(String, nullable=False, index=True)
 
 
 Base.metadata.create_all()

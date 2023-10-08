@@ -1,22 +1,22 @@
 import json
 from hashlib import md5
 
-from flask import Flask, request, jsonify
-from flask.views import MethodView
 from pydantic import ValidationError
 from sqlalchemy.exc import IntegrityError
 
-from schema import CreateUser, UpdateUser
-from models import User, Session
+from flask import Flask, jsonify, request
+from flask.views import MethodView
+from models import Session, Advert
+from schema import CreateAdv, UpdateAdv
 
+app = Flask("app")
 
-app = Flask('app')
 
 class HttpError(Exception):
-
     def __init__(self, status_code: int, message: dict | str | list):
         self.status_code = status_code
         self.message = message
+
 
 def validate(json_data, schema):
     try:
@@ -29,92 +29,70 @@ def validate(json_data, schema):
 
 @app.errorhandler(HttpError)
 def error_handler(er: HttpError):
-    http_response = jsonify({'status': 'error', 'message': er.message})
+    http_response = jsonify({"status": "error", "message": er.message})
     http_response.status_code = er.status_code
     return http_response
 
-SALT = '3fgffdf577d'
 
-def hash_password(password: str):
-    password = f'{SALT}{password}'
-    password = password.encode()
-    password = md5(password).hexdigest()
-    return password
-
-
-def get_user(user_id: int, session: Session):
-    user = session.get(User, user_id)
-    if user is None:
-        raise HttpError(404, 'user not found')
-    return user
+def get_adv(adv_id: int, session: Session):
+    advertisement = session.get(Advert, adv_id)
+    if advertisement is None:
+        raise HttpError(404, "advertisement not found")
+    return advertisement
 
 
-class UsersView(MethodView):
-
-    def get(self, user_id):
+class AdvertView(MethodView):
+    def get(self, adv_id):
         with Session() as session:
-            user = get_user(user_id, session)
-            return jsonify({
-                'id': user.id,
-                'name': user.name
-            })
-
+            advertisement = get_adv(adv_id, session)
+            return jsonify({"id": advertisement.id, "header": advertisement.header})
 
     def post(self):
-        json_data = validate(request.json, CreateUser)
-        json_data['password'] = hash_password(json_data['password'])
+        json_data = validate(request.json, CreateAdv)
         with Session() as session:
-            new_user = User(**json_data)
-            session.add(new_user)
+            new_advertisement = Advert(**json_data)
+            session.add(new_advertisement)
             try:
                 session.commit()
             except IntegrityError:
-                raise HttpError(408, 'user already exists')
-            return jsonify({
-                'id': new_user.id
-            })
+                raise HttpError(408, "advertisement already exists")
+            return jsonify({"id": new_advertisement.id})
 
-
-    def patch(self, user_id):
-        json_data = validate(request.json, UpdateUser)
-        if 'password' in json_data:
-            json_data['password'] = hash_password(json_data['password'])
+    def patch(self, adv_id):
+        json_data = validate(request.json, UpdateAdv)
+        # if "password" in json_data:
+        #     json_data["password"] = hash_password(json_data["password"])
         with Session() as session:
-            user = get_user(user_id, session)
+            advertisement = get_adv(adv_id, session)
             for key, value in json_data.items():
-                setattr(user, key, value)
-            session.add(user)
+                setattr(Advert, key, value)
+            session.add(advertisement)
             try:
                 session.commit()
             except IntegrityError:
-                raise HttpError(408, 'user already exists')
-            return jsonify({
-                'status': 'success'
-            })
+                raise HttpError(408, "header already exists")
+            return jsonify({"status": "success"})
 
-
-    def delete(self, user_id):
+    def delete(self, adv_id):
         with Session() as session:
-            user = get_user(user_id, session)
-            session.delete(user)
+            advertisement = get_adv(adv_id, session)
+            session.delete(advertisement)
             session.commit()
-            return jsonify({
-                'status': 'success'
-            })
+            return jsonify({"status": "success"})
 
 
-user_view = UsersView.as_view('users')
+adv_view = AdvertView.as_view("advertisement")
 
 app.add_url_rule(
-    '/users/',
-    view_func=user_view,
-    methods=['POST']
-)
+    "/advertisements/",
+    view_func=adv_view,
+    methods=["POST"])
 
 app.add_url_rule(
-    '/users/<int:user_id>',
-    view_func=user_view,
-    methods=['GET', 'PATCH', 'DELETE']
+    "/advertisements/<int:adv_id>",
+    view_func=adv_view,
+    methods=["GET", "PATCH", "DELETE"]
 )
-if __name__ == '__main__':
-    app.run()
+
+if __name__ == "__main__":
+    app.run(port=8000)
