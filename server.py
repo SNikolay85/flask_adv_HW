@@ -1,12 +1,11 @@
 import json
-from hashlib import md5
-
-from pydantic import ValidationError
-from sqlalchemy.exc import IntegrityError
 
 from flask import Flask, jsonify, request
 from flask.views import MethodView
-from models import Session, Advert
+from pydantic import ValidationError
+from sqlalchemy.exc import IntegrityError
+
+from models import Advert, Session
 from schema import CreateAdv, UpdateAdv
 
 app = Flask("app")
@@ -45,7 +44,14 @@ class AdvertView(MethodView):
     def get(self, adv_id):
         with Session() as session:
             advertisement = get_adv(adv_id, session)
-            return jsonify({"id": advertisement.id, "header": advertisement.header})
+            return jsonify(
+                {
+                    "id": advertisement.id,
+                    "header": advertisement.header,
+                    "description": advertisement.description,
+                    "user": advertisement.user,
+                }
+            )
 
     def post(self):
         json_data = validate(request.json, CreateAdv)
@@ -58,24 +64,28 @@ class AdvertView(MethodView):
                 raise HttpError(408, "advertisement already exists")
             return jsonify({"id": new_advertisement.id})
 
-    def patch(self, adv_id):
+    def patch(self, user, adv_id):
         json_data = validate(request.json, UpdateAdv)
-        # if "password" in json_data:
-        #     json_data["password"] = hash_password(json_data["password"])
+        if user != json_data["user"]:
+            raise HttpError(401, "invalid user specified")
         with Session() as session:
             advertisement = get_adv(adv_id, session)
             for key, value in json_data.items():
-                setattr(Advert, key, value)
+                setattr(advertisement, key, value)
             session.add(advertisement)
             try:
                 session.commit()
             except IntegrityError:
-                raise HttpError(408, "header already exists")
-            return jsonify({"status": "success"})
+                raise HttpError(408, "advertisement already exists")
+            return jsonify(
+                {"status": "success", "description": advertisement.description}
+            )
 
-    def delete(self, adv_id):
+    def delete(self, user, adv_id):
         with Session() as session:
             advertisement = get_adv(adv_id, session)
+            if user != advertisement.user:
+                raise HttpError(401, "invalid user specified")
             session.delete(advertisement)
             session.commit()
             return jsonify({"status": "success"})
@@ -83,15 +93,14 @@ class AdvertView(MethodView):
 
 adv_view = AdvertView.as_view("advertisement")
 
-app.add_url_rule(
-    "/advertisements/",
-    view_func=adv_view,
-    methods=["POST"])
+app.add_url_rule("/advertisements/", view_func=adv_view, methods=["POST"])
+
+app.add_url_rule("/advertisements/<int:adv_id>", view_func=adv_view, methods=["GET"])
 
 app.add_url_rule(
-    "/advertisements/<int:adv_id>",
+    "/advertisements/<user>/<int:adv_id>",
     view_func=adv_view,
-    methods=["GET", "PATCH", "DELETE"]
+    methods=["PATCH", "DELETE"],
 )
 
 if __name__ == "__main__":

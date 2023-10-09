@@ -30,7 +30,7 @@ class Advert(Base):
     header = Column(String, nullable=False, unique=True)
     description = Column(String)
     creation_time = Column(DateTime, server_default=func.now())
-    user = Column(String, nullable=False, index=True)
+    user = Column(String, nullable=False)
 
 
 Base.metadata.create_all()
